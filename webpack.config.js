@@ -46,12 +46,16 @@ module.exports = {
   mode: "development",
   entry: "./js/index.js",
   devServer: {
+    // 完全禁用静态文件服务，使用内存模式
     static: false,
     compress: true,
     port: 3000,
+    // 完全禁用热更新和实时重新加载
     hot: false,
     liveReload: false,
+    // 禁用文件监视
     watchFiles: [],
+    // 配置 devMiddleware
     devMiddleware: {
       writeToDisk: false,
       stats: "errors-only",
@@ -119,6 +123,7 @@ module.exports = {
     ],
   },
   plugins: [
+    // 显式忽略输出目录，防止 watch 循环（webpack-dev-server v5 与 build 目录冲突）
     new webpack.WatchIgnorePlugin({
       paths: [
         path.join(__dirname, "build"),

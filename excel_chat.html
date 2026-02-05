@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Excel / Chat | DataOrchestrator - Data Platform & AI Agent</title>
+    <script src="./components/api-client.js" type="module"></script>
+    <style>
+      /* File Card Styles */
+      .file-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.5rem;
+        transition: all 0.2s;
+      }
+      .file-card:hover {
+        border-color: #6366f1;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      }
+      .file-card.dark {
+        background: #1f2937;
+        border-color: #374151;
+      }
+      .file-card.dark:hover {
+        border-color: #4b5563;
+      }
+      
+      .file-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .file-icon.pdf {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+      .file-icon.pdf.dark {
+        background: #7f1d1d;
+        color: #f87171;
+      }
+      .file-icon.excel {
+        background: #f0fdf4;
+        color: #16a34a;
+      }
+      .file-icon.excel.dark {
+        background: #14532d;
+        color: #4ade80;
+      }
+      .file-icon.csv {
+        background: #eff6ff;
+        color: #2563eb;
+      }
+      .file-icon.csv.dark {
+        background: #1e3a8a;
+        color: #60a5fa;
+      }
+      
+      .upload-area {
+        border: 2px dashed #d1d5db;
+        border-radius: 0.5rem;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.2s;
+      }
+      .upload-area:hover {
+        border-color: #6366f1;
+        background: #f5f5f5;
+      }
+      .upload-area.dark:hover {
+        border-color: #6366f1;
+        background: #1f2937;
+      }
+      
+      .upload-area.dark {
+        border-color: #374151;
+      }
+      
+      .spinner {
+        width: 1.5rem;
+        height: 1.5rem;
+        border: 2px solid transparent;
+        border-top-color: #ca8a04;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body
+    x-data="{
+      page: 'excel_chat',
+      'loaded': true,
+      'darkMode': false,
+      'stickyMenu': false,
+      'sidebarToggle': false,
+      'scrollTop': false,
+      message: '',
+      messages: [],
+      // ✅ 新增：Session 文件列表（持久化）
+      sessionFiles: [],
+      // ✅ 保留：本地待上传文件队列
+      pendingFiles: [],
+      currentSession: null,
+      isLoading: false,
+      error: null
+    }"
+    x-init="
+      darkMode = JSON.parse(localStorage.getItem('darkMode'));
+      $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)));
+      if (!localStorage.getItem('token')) {
+        window.location.href = 'login.html';
+      }
+      
+      window.logout = async function() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
+      };
+      
+      // ✅ 新增：获取 Session ID
+      function getCurrentSessionId() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        const savedSessions = JSON.parse(localStorage.getItem('chatSessions') || '[]');
+        if (sessionId) {
+          return sessionId;
+        }
+        if (savedSessions.length > 0) {
+          return savedSessions[0].id;
+        }
+        return 'session-' + Date.now();
+      }
+      currentSession = getCurrentSessionId();
+      
+      // ✅ 新增：加载 Session 文件
+      window.loadSessionFiles = async function() {
+        if (!currentSession) return;
+        try {
+          const client = new APIClient('opencode_agent');
+          const response = await client.getSessionFiles(currentSession);
+          sessionFiles = response.files || [];
+          console.log('[Files] Loaded session files:', sessionFiles.length);
+        } catch (err) {
+          console.error('[Files] Failed to load session files:', err);
+          sessionFiles = [];
+        }
+      };
+      
+      // ✅ 修改：上传文件到 Session（而非仅本地存储）
+      window.uploadFilesToSession = async function() {
+        if (pendingFiles.length === 0 || !currentSession) return;
+        
+        try {
+          const client = new APIClient('opencode_agent');
+          
+          // 批量上传
+          const formData = new FormData();
+          pendingFiles.forEach(f => formData.append('files', f));
+          
+          const response = await client.uploadSessionFiles(currentSession, pendingFiles);
+          
+          // 更新 Session 文件列表
+          sessionFiles = [...sessionFiles, ...response.files];
+          
+          // 清空待上传队列
+          pendingFiles = [];
+          
+          console.log('[Files] Uploaded', response.files.length, 'files to session');
+        } catch (err) {
+          error = err.message || 'Failed to upload files';
+          console.error('[Files] Upload error:', err);
+        }
+      };
+      
+      // ✅ 修改：从 Session 删除文件
+      window.removeSessionFile = async function(fileId) {
+        if (!currentSession) return;
+        try {
+          const client = new APIClient('opencode_agent');
+          await client.deleteSessionFile(currentSession, fileId);
+          sessionFiles = sessionFiles.filter(f => f.file_id !== fileId);
+          console.log('[Files] Removed file:', fileId);
+        } catch (err) {
+          error = err.message || 'Failed to delete file';
+          console.error('[Files] Delete error:', err);
+        }
+      };
+      
+      // ✅ 修改：本地选择文件（待上传）
+      window.handleFileSelect = function(event) {
+        const selectedFiles = Array.from(event.target.files);
+        pendingFiles = [...pendingFiles, ...selectedFiles];
+        // 自动上传到 Session
+        $nextTick(() => uploadFilesToSession());
+      };
+      
+      // ✅ 新增：格式化文件大小
+      window.formatFileSize = function(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
+      };
+      
+      // ✅ 新增：格式化日期
+      window.formatDate = function(dateStr) {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      };
+      
+      // ✅ 新增：获取文件图标类型
+      window.getFileIconClass = function(mimeType) {
+        if (!mimeType) return 'excel';
+        if (mimeType.includes('pdf')) return 'pdf';
+        if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return 'excel';
+        if (mimeType.includes('csv')) return 'csv';
+        return 'excel';
+      };
+      
+      window.sendMessage = async function() {
+        if (!message.trim()) return;
+        
+        const userMsg = { role: 'user', content: message };
+        messages = [...messages, userMsg];
+        const msgToSend = message;
+        message = '';
+        isLoading = true;
+        error = null;
+        
+        try {
+          const client = new APIClient('opencode_agent');
+          
+          // ✅ 修改：自动附加 Session 文件
+          const context = {};
+          if (sessionFiles.length > 0) {
+            context.file_paths = sessionFiles.map(f => f.file_path);
+            context.session_files = sessionFiles;
+          }
+          
+          const response = await client.chat(msgToSend, 'excel', currentSession, context);
+          
+          const assistantMsg = { role: 'assistant', content: response.parts?.[0]?.text || '', toolCalls: response.tool_calls };
+          messages = [...messages, assistantMsg];
+          
+          if (response.session_id) {
+            currentSession = response.session_id;
+          }
+        } catch (err) {
+          error = err.message || 'Failed to send message';
+          console.error('[Chat] Error:', err);
+        } finally {
+          isLoading = false;
+          // Auto scroll to bottom
+          setTimeout(() => {
+            const container = document.getElementById('messages-container');
+            if (container) container.scrollTop = container.scrollHeight;
+          }, 100);
+        }
+      };
+      
+      // Session 变化时加载文件
+      $watch('currentSession', (val) => {
+        if (val) loadSessionFiles();
+      });
+      
+      // 初始加载
+      $nextTick(() => loadSessionFiles());
+    "
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <include src="./partials/preloader.html"></include>
+    <!-- ===== Preloader End ===== -->
+    
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <include src="./partials/sidebar-custom.html"></include>
+      <!-- ===== Sidebar End ===== -->
+      
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-col flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        <!-- Small Device Overlay Start -->
+        <include src="./partials/overlay.html" />
+        <!-- Small Device Overlay End -->
+        
+        <!-- ===== Header Start ===== -->
+        <include src="./partials/header-custom.html" />
+        <!-- ===== Header End ===== -->
+        
+        <!-- ===== Main Content Start ===== -->
+        <main class="flex-1 flex flex-col">
+          <div class="flex-1 p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6 w-full">
+            <!-- Page Title -->
+            <div class="mb-6">
+              <h1 class="mb-1 font-semibold text-gray-800 text-title-md dark:text-white/90">
+                Excel / Chat
+              </h1>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Upload Excel files or chat with AI for analysis
+              </p>
+            </div>
+            
+            <!-- File Upload Area -->
+            <div class="p-6 mb-6 bg-white border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700">
+              <h3 class="mb-4 font-semibold text-gray-800 dark:text-white">
+                Files (Session Context)
+              </h3>
+              
+              <!-- Upload Button -->
+              <div class="upload-area" :class="{ 'dark': darkMode === true }">
+                <input
+                  type="file"
+                  multiple
+                  accept=".xlsx,.xls,.csv,.pdf"
+                  @change="handleFileSelect($event)"
+                  class="hidden"
+                  id="file-upload"
+                />
+                <label for="file-upload" class="cursor-pointer">
+                  <svg
+                    class="mx-auto mb-2 text-gray-400"
+                    width="40"
+                    height="40"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 16L7 11H10V4H14V11H17L12 16ZM4 18V20H20V18H4Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <span class="text-sm text-gray-600 dark:text-gray-400">
+                    Drop files here or <span class="text-brand-500">browse</span>
+                  </span>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-500">
+                    Supports: .xlsx, .xls, .csv, .pdf
+                  </p>
+                </label>
+              </div>
+              
+              <!-- Session Files List (持久化) -->
+              <div x-show="sessionFiles.length > 0" class="mt-4">
+                <h4 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Attached Files (<span x-text="sessionFiles.length"></span>)
+                </h4>
+                <div class="space-y-2">
+                  <template x-for="(file, index) in sessionFiles" :key="file.file_id">
+                    <div class="file-card" :class="{ 'dark': darkMode === true }">
+                      <div class="flex items-center gap-3">
+                        <div class="file-icon" :class="getFileIconClass(file.mime_type)">
+                          <svg
+                            class="text-current"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          >
+                            <path
+                              d="M14 2H6C5.44772 2 5 2.44772 5 3V21C5 21.5523 5.44772 22 6 22H18C18.5523 22 19 21.5523 19 21V7L14 2Z"
+                              fill="currentColor"
+                              fill-opacity="0.2"
+                            />
+                            <path
+                              d="M13 8V2.5L18.5 8H13Z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm font-medium text-gray-900 dark:text-gray-200 truncate">
+                            <span x-text="file.file_name"></span>
+                          </div>
+                          <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                            <span x-text="formatFileSize(file.file_size)"></span>
+                            <span x-show="file.mime_type" class="px-1.5 py-0.5 bg-gray-100 rounded dark:bg-gray-700">
+                              <span x-text="file.mime_type"></span>
+                            </span>
+                            <span class="text-xs text-gray-400" x-text="formatDate(file.uploaded_at)"></span>
+                          </div>
+                        </div>
+                      </div>
+                      <button @click="removeSessionFile(file.file_id)" class="text-gray-400 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M6 18L18 6M6 6L18 18" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              
+              <!-- Pending Upload Queue (实时反馈) -->
+              <div x-show="pendingFiles.length > 0" class="mt-4">
+                <h4 class="mb-2 text-sm font-medium text-yellow-600 dark:text-yellow-400">
+                  Uploading... (<span x-text="pendingFiles.length"></span>)
+                </h4>
+                <div class="space-y-2">
+                  <template x-for="(file, index) in pendingFiles" :key="index">
+                    <div class="flex items-center p-3 bg-yellow-50 rounded-lg dark:bg-yellow-900/20">
+                      <div class="flex items-center gap-3">
+                        <div class="spinner"></div>
+                        <span class="text-sm text-yellow-800 dark:text-yellow-200" x-text="file.name"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Chat Messages -->
+            <div class="flex-1 p-6 bg-white border border-gray-200 rounded-xl dark:bg-gray-800 dark:border-gray-700 flex flex-col">
+              <!-- Messages Container -->
+              <div
+                id="messages-container"
+                class="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[400px]"
+              >
+                <template x-if="messages.length === 0">
+                  <div class="text-center py-12">
+                    <svg
+                      class="mx-auto mb-4 text-gray-300"
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2ZM20 16H6L4 18V4H20V16Z"
+                        fill="currentColor"
+                        fill-opacity="0.3"
+                      />
+                    </svg>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      Start a conversation or upload files for analysis
+                    </p>
+                  </div>
+                </template>
+                
+                <template x-for="(msg, index) in messages" :key="index">
+                  <!-- User Message -->
+                  <div x-show="msg.role === 'user'" class="flex justify-end">
+                    <div class="max-w-[70%] p-4 bg-brand-500 text-white rounded-2xl rounded-br-md">
+                      <p class="text-sm" x-text="msg.content"></p>
+                    </div>
+                  </div>
+                  
+                  <!-- Assistant Message -->
+                  <div x-show="msg.role === 'assistant'" class="flex justify-start">
+                    <div class="max-w-[70%] p-4 bg-gray-100 rounded-2xl rounded-bl-md dark:bg-gray-700">
+                      <p class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap" x-text="msg.content"></p>
+                      
+                      <!-- Tool Calls -->
+                      <div x-show="msg.toolCalls && msg.toolCalls.length > 0" class="mt-3 space-y-2">
+                        <template x-for="(tool, tIndex) in msg.toolCalls" :key="tIndex">
+                          <div class="p-3 bg-purple-50 rounded-lg dark:bg-purple-900/20">
+                            <div class="text-xs font-medium text-purple-600 dark:text-purple-400" x-text="tool.name"></div>
+                            <div class="mt-1 text-xs text-gray-600 dark:text-gray-400" x-text="JSON.stringify(tool.args, null, 2)"></div>
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                
+                <!-- Loading Indicator -->
+                <div x-show="isLoading" class="flex justify-start">
+                  <div class="p-4 bg-gray-100 rounded-2xl rounded-bl-md dark:bg-gray-700">
+                    <div class="flex gap-1">
+                      <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                      <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                      <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Error Message -->
+              <div x-show="error" class="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-lg dark:bg-red-900/20 dark:text-red-400">
+                <span x-text="error"></span>
+              </div>
+              
+              <!-- Input Area -->
+              <div class="flex gap-3">
+                <input
+                  x-model="message"
+                  @keydown.enter="sendMessage()"
+                  type="text"
+                  placeholder="Type your message..."
+                  :disabled="isLoading"
+                  class="flex-1 px-4 py-3 rounded-lg border border-gray-300 bg-transparent text-sm text-gray-800 focus:border-brand-300 focus:outline-hidden dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 disabled:opacity-50"
+                />
+                <button
+                  @click="sendMessage()"
+                  :disabled="isLoading || !message.trim()"
+                  class="px-6 py-3 text-sm font-medium text-white rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Send
+                </button>
+              </div>
+              
+              <!-- Session Files Indicator -->
+              <div x-show="sessionFiles.length > 0" class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                Session: <span x-text="currentSession"></span> · 
+                <span x-text="sessionFiles.length"></span> file(s) attached
+              </div>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+  </body>
+</html>

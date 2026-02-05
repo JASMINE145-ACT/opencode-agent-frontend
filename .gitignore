@@ -1,2 +1,5 @@
 # dev server 输出目录，避免循环编译用，勿提交
 .dev-output
+
+# Windows 保留设备名，Git 无法索引
+nul

@@ -1,0 +1,28 @@
+<div
+  id="preloader"
+  class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black pointer-events-none transition-opacity duration-200"
+  role="presentation"
+  aria-hidden="true"
+>
+  <div
+    class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent"
+  ></div>
+</div>
+<script>
+  (function () {
+    function hidePreloader() {
+      var el = document.getElementById('preloader');
+      if (el) {
+        el.style.opacity = '0';
+        el.style.pointerEvents = 'none';
+        setTimeout(function () { el.style.display = 'none'; }, 220);
+      }
+    }
+    if (document.readyState === 'complete') {
+      setTimeout(hidePreloader, 180);
+    } else {
+      window.addEventListener('load', function () { setTimeout(hidePreloader, 180); });
+    }
+    setTimeout(hidePreloader, 800);
+  })();
+</script>

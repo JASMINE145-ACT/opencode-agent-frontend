@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Main Chat | DataOrchestrator - Data Platform & AI Agent</title>
+    <script src="./components/api-client.js" type="module"></script>
+  </head>
+  <body
+    x-data="{
+      page: 'main_chat',
+      'loaded': true,
+      'darkMode': false,
+      'stickyMenu': false,
+      'sidebarToggle': false,
+      'scrollTop': false,
+      sessionId: null,
+      currentSession: null,
+      sessions: [],
+      inputMessage: '',
+      isLoading: false,
+      toolExecution: null,
+      selectedAgent: 'default',
+      agents: [
+        { value: 'default', label: 'Default (Orchestrator)' },
+        { value: 'excel', label: 'Excel Agent' },
+        { value: 'data', label: 'Data Agent' },
+        { value: 'action', label: 'Action Agent' },
+        { value: 'plan', label: 'Plan Agent' }
+      ]
+    }"
+    x-init="
+      darkMode = JSON.parse(localStorage.getItem('darkMode'));
+      $watch('darkMode', value => localStorage.setItem('darkMode', JSON.stringify(value)));
+      selectedAgent = localStorage.getItem('selectedAgent') || 'default';
+      $watch('selectedAgent', value => localStorage.setItem('selectedAgent', value));
+
+      // Get session ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      sessionId = urlParams.get('session');
+
+      // Load sessions
+      const savedSessions = localStorage.getItem('chatSessions');
+      if (savedSessions) {
+        sessions = JSON.parse(savedSessions);
+      }
+
+      // Set current session
+      if (sessionId && sessions.find(s => s.id === sessionId)) {
+        currentSession = sessions.find(s => s.id === sessionId);
+      } else if (sessions.length > 0) {
+        currentSession = sessions[0];
+        sessionId = currentSession.id;
+      } else {
+        // Create new session
+        currentSession = {
+          id: 'session-' + Date.now(),
+          title: 'New Chat',
+          messages: [],
+          createdAt: new Date().toISOString()
+        };
+        sessions.unshift(currentSession);
+        sessionId = currentSession.id;
+        localStorage.setItem('chatSessions', JSON.stringify(sessions));
+      }
+
+      if (!localStorage.getItem('token')) {
+        window.location.href = 'login.html';
+      }
+
+      window.logout = async function() {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
+      };
+
+      window.sendMessage = async function() {
+        if (!inputMessage.trim() || isLoading) return;
+
+        const userMessage = {
+          role: 'user',
+          content: inputMessage.trim(),
+          timestamp: new Date().toISOString(),
+          tool_calls: []
+        };
+
+        // Add user message to current session
+        currentSession.messages.push(userMessage);
+        inputMessage = '';
+        isLoading = true;
+
+        // Save to localStorage
+        localStorage.setItem('chatSessions', JSON.stringify(sessions));
+
+        try {
+          const client = new APIClient('opencode_agent');
+          const response = await client.chat(userMessage.content, selectedAgent, sessionId);
+
+          // Add assistant response to current session
+          const assistantMessage = {
+            role: 'assistant',
+            content: response.message || response.response || '',
+            timestamp: new Date().toISOString(),
+            tool_calls: response.tool_calls || []
+          };
+
+          currentSession.messages.push(assistantMessage);
+
+          // Update session title if it's the first message
+          if (currentSession.messages.length === 2 && currentSession.title === 'New Chat') {
+            currentSession.title = userMessage.content.substring(0, 30) + (userMessage.content.length > 30 ? '...' : '');
+          }
+
+          // Save to localStorage
+          localStorage.setItem('chatSessions', JSON.stringify(sessions));
+
+        } catch (err) {
+          const errorMessage = {
+            role: 'assistant',
+            content: 'Error: ' + (err.message || 'Failed to send message'),
+            timestamp: new Date().toISOString(),
+            isError: true,
+            tool_calls: []
+          };
+          currentSession.messages.push(errorMessage);
+          localStorage.setItem('chatSessions', JSON.stringify(sessions));
+        } finally {
+          isLoading = false;
+          scrollToBottom();
+        }
+      };
+
+      // 供自动化/测试调用：设置 Agent、输入消息并发送
+      window.testDataAgent = function(query) {
+        if (typeof query !== 'string') query = '查1月28日那天卖了多少钱';
+        selectedAgent = 'data';
+        inputMessage = query;
+        $nextTick(() => { sendMessage(); });
+      };
+
+      window.scrollToBottom = function() {
+        const messagesContainer = document.getElementById('messages-container');
+        if (messagesContainer) {
+          setTimeout(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }, 100);
+        }
+      };
+
+      window.handleKeyPress = function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      };
+
+      // Scroll to bottom on load
+      $nextTick(() => scrollToBottom());
+    "
+    :class="{'dark bg-gray-900': darkMode === true}"
+  >
+    <!-- ===== Preloader Start ===== -->
+    <include src="./partials/preloader.html"></include>
+    <!-- ===== Preloader End ===== -->
+
+    <!-- ===== Page Wrapper Start ===== -->
+    <div class="flex h-screen overflow-hidden">
+      <!-- ===== Sidebar Start ===== -->
+      <include src="./partials/sidebar-custom.html"></include>
+      <!-- ===== Sidebar End ===== -->
+
+      <!-- ===== Content Area Start ===== -->
+      <div
+        class="relative flex flex-col flex-1 overflow-x-hidden"
+      >
+        <!-- Small Device Overlay Start -->
+        <include src="./partials/overlay.html" />
+        <!-- Small Device Overlay End -->
+
+        <!-- ===== Header Start ===== -->
+        <include src="./partials/header-custom.html" />
+        <!-- ===== Header End ===== -->
+
+        <!-- ===== Main Content Start ===== -->
+        <main
+          id="messages-container"
+          class="flex-1 overflow-y-auto"
+        >
+          <div class="max-w-4xl mx-auto px-4 py-6">
+            <!-- Welcome Message -->
+            <div x-show="currentSession.messages.length === 0" class="text-center py-12">
+              <div class="mb-6 text-6xl">💬</div>
+              <h2 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white">
+                Welcome to DataOrchestrator
+              </h2>
+              <p class="text-gray-500 dark:text-gray-400">
+                Ask me anything about your data, upload files, or start a new conversation
+              </p>
+            </div>
+
+            <!-- Messages List -->
+            <div class="space-y-6">
+              <template x-for="(message, index) in currentSession.messages" :key="index">
+                <div
+                  class="flex gap-4"
+                  :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+                >
+                  <!-- Avatar -->
+                  <div
+                    class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                    :class="message.role === 'user' ? 'bg-brand-500 text-white order-2' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
+                  >
+                    <span x-text="message.role === 'user' ? '👤' : '🤖'"></span>
+                  </div>
+
+                  <!-- Message Content -->
+                  <div
+                    class="max-w-[70%] px-4 py-3 rounded-2xl"
+                    :class="message.role === 'user'
+                      ? 'bg-brand-500 text-white rounded-br-none'
+                      : (message.isError ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-white border border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200')"
+                  >
+                     <!-- Tool Execution Info -->
+                      <div x-show="message.tool_calls && message.tool_calls.length > 0 && message.tool_calls[0]" class="mb-3 p-3 bg-gray-50 rounded-lg dark:bg-gray-700/50">
+                        <div class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                           <span>Tool Called: <strong x-text="message.tool_calls[0] && message.tool_calls[0].name ? message.tool_calls[0].name : 'tool'"></strong></span>
+                        </div>
+                        <template x-if="message.tool_calls[0] && message.tool_calls[0].arguments && message.tool_calls[0].arguments !== undefined">
+                          <div class="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                            <span x-text="JSON.stringify(message.tool_calls[0].arguments)"></span>
+                          </div>
+                        </template>
+                      </div>
+
+                    <!-- Message Text -->
+                    <div class="text-sm whitespace-pre-wrap" x-text="message.content"></div>
+
+                    <!-- Timestamp -->
+                    <div
+                      class="mt-2 text-xs opacity-60"
+                      :class="message.role === 'user' ? 'text-white' : 'text-gray-500 dark:text-gray-400'"
+                    >
+                      <span x-text="new Date(message.timestamp).toLocaleTimeString()"></span>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Loading Indicator -->
+              <div x-show="isLoading" class="flex gap-4 justify-start">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300 flex items-center justify-center">
+                  <span>🤖</span>
+                </div>
+                <div class="bg-white border border-gray-200 px-4 py-3 rounded-2xl rounded-tl-none dark:bg-gray-800 dark:border-gray-700">
+                  <div class="flex gap-1">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+        <!-- ===== Main Content End ===== -->
+
+        <!-- ===== Input Area Start ===== -->
+        <div class="border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+          <div class="max-w-4xl mx-auto">
+            <!-- Agent Selector -->
+            <div class="mb-3">
+              <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-400">
+                Select Agent
+              </label>
+              <select
+                x-model="selectedAgent"
+                :disabled="isLoading"
+                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+              >
+                <template x-for="agent in agents" :key="agent.value">
+                  <option :value="agent.value" x-text="agent.label"></option>
+                </template>
+              </select>
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <span x-show="selectedAgent === 'default'">
+                  Orchestrator: Routes tasks to specialized agents automatically
+                </span>
+                <span x-show="selectedAgent === 'excel'">
+                  Excel Agent: Specialized in Excel file processing
+                </span>
+                <span x-show="selectedAgent === 'data'">
+                  Data Agent: Queries business data and databases
+                </span>
+                <span x-show="selectedAgent === 'action'">
+                  Action Agent: Sends emails and notifications
+                </span>
+                <span x-show="selectedAgent === 'plan'">
+                  Plan Agent: Complex task planning and decomposition
+                </span>
+              </p>
+            </div>
+            <div class="flex gap-3">
+              <div class="flex-1 relative">
+                <textarea
+                  x-model="inputMessage"
+                  @keydown="handleKeyPress($event)"
+                  placeholder="Type your message..."
+                  rows="1"
+                  class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 resize-none dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
+                  :disabled="isLoading"
+                ></textarea>
+              </div>
+              <button
+                data-testid="send-message-btn"
+                @click="sendMessage()"
+                :disabled="isLoading || !inputMessage.trim()"
+                class="flex items-center justify-center px-6 py-3 text-sm font-medium text-white transition rounded-xl bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg x-show="!isLoading" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg x-show="isLoading" class="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- ===== Input Area End ===== -->
+      </div>
+      <!-- ===== Content Area End ===== -->
+    </div>
+    <!-- ===== Page Wrapper End ===== -->
+  </body>
+</html>

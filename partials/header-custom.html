@@ -1,0 +1,132 @@
+<header
+  :class="sidebarToggle ? 'lg:ml-[90px]' : 'lg:ml-[290px]'"
+  class="flex items-center justify-between gap-4 px-4 py-4 border-b border-gray-200 transition-all duration-300 dark:border-gray-800 sm:px-6 lg:px-8"
+>
+  <!-- Left: Breadcrumb -->
+  <div class="flex items-center gap-3">
+    <button
+      @click="sidebarToggle = !sidebarToggle"
+      class="p-2 rounded-lg border border-gray-200 dark:border-gray-800 lg:hidden"
+    >
+      <svg
+        class="fill-current text-gray-500 dark:text-gray-400"
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M3.42871 4.03516H16.5716C16.9858 4.03516 17.3216 4.37094 17.3216 4.78516C17.3216 5.19937 16.9858 5.53516 16.5716 5.53516H3.42871C3.0145 5.53516 2.67871 5.19937 2.67871 4.78516C2.67871 4.37094 3.0145 4.03516 3.42871 4.03516ZM3.42871 9.03516H16.5716C16.9858 9.03516 17.3216 9.37094 17.3216 9.78516C17.3216 10.1994 16.9858 10.5352 16.5716 10.5352H3.42871C3.0145 10.5352 2.67871 10.1994 2.67871 9.78516C2.67871 9.37094 3.0145 9.03516 3.42871 9.03516ZM3.42871 14.0352H16.5716C16.9858 14.0352 17.3216 14.3709 17.3216 14.7852C17.3216 15.1994 16.9858 15.5352 16.5716 15.5352H3.42871C3.0145 15.5352 2.67871 15.1994 2.67871 14.7852C2.67871 14.3709 3.0145 14.0352 3.42871 14.0352Z"
+          fill=""
+        />
+      </svg>
+    </button>
+
+    <div class="hidden sm:block">
+      <ol class="flex items-center gap-2">
+        <li class="text-sm font-medium text-gray-500 dark:text-gray-400">
+          <a href="index.html">Dashboard</a>
+        </li>
+        <li class="text-sm text-gray-400">/</li>
+        <li class="text-sm font-medium text-brand-500 dark:text-brand-400" x-text="((page || 'dashboard').charAt(0).toUpperCase() + (page || 'dashboard').slice(1))">Dashboard</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Right: User & Actions -->
+  <div class="flex items-center gap-3">
+    <!-- Dark Mode Toggle -->
+    <button
+      @click="darkMode = !darkMode"
+      class="p-2 rounded-lg border border-gray-200 hover:border-brand-300 dark:border-gray-700 dark:hover:border-brand-500 transition-colors"
+    >
+      <svg
+        class="hidden fill-current text-gray-500 dark:block dark:text-gray-400"
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M12.0559 1.69239C12.8565 1.55486 13.5579 2.33336 13.4039 3.13078C13.3477 3.41674 13.2831 3.69985 13.2101 3.97986C12.5864 6.39653 12.9551 8.99558 14.2259 11.1369C15.4967 13.2782 17.5534 14.7629 19.9731 15.3744C20.2546 15.4461 20.5392 15.5094 20.8267 15.5645C21.6269 15.7166 22.4071 16.4164 22.2676 17.2163C22.1281 18.0162 21.126 18.6262 20.3265 18.4728C18.0896 18.0353 16.0244 17.1005 14.3907 15.6178C13.0189 14.3485 12.0688 12.6095 11.7211 10.7146C11.3733 8.81971 11.6482 6.86867 12.4992 5.15159C12.6507 4.84405 12.812 4.54161 12.9826 4.2446C13.3871 3.54628 13.2553 2.82991 12.0559 1.69239ZM10.9598 17.5871C10.5064 17.4756 10.2246 17.0177 10.3361 16.5643C10.4477 16.1109 10.9056 15.8292 11.359 15.9407C12.8439 16.309 14.4243 16.3318 15.9233 16.0076C16.3764 15.8955 16.8349 16.1766 16.947 16.6298C17.0591 17.0829 16.778 17.5408 16.3249 17.653C14.5822 18.0309 12.7489 18.0037 11.0141 17.5725C10.9957 17.5679 10.9776 17.5776 10.9598 17.5871ZM5.99992 12.4457C6.25359 12.5623 6.53315 12.6066 6.81046 12.5732C7.23965 12.5215 7.55319 12.1282 7.50152 11.699C7.44984 11.2698 7.05652 10.9562 6.62734 11.0079C6.40875 11.0344 6.19387 10.9882 6.00624 10.8768C5.82876 10.7715 5.67936 10.6216 5.57464 10.4438C5.35049 10.0671 4.87038 9.93993 4.49367 10.1641C4.11695 10.3882 3.98984 10.8683 4.21399 11.245C4.47915 11.6909 4.88414 12.043 5.35862 12.2479C5.56057 12.3318 5.77433 12.3965 5.99992 12.4457Z"
+          fill=""
+        />
+      </svg>
+      <svg
+        class="fill-current text-gray-500 dark:hidden"
+        width="20"
+        height="20"
+        viewBox="0 0 20 20"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M17.4547 11.97L18.1799 12.1611C18.265 11.8383 18.1265 11.4982 17.8401 11.3266C17.5538 11.1551 17.1885 11.1934 16.944 11.4207L17.4547 11.97ZM8.0306 2.5459L8.57989 3.05657C8.80718 2.81209 8.84554 2.44682 8.67398 2.16046C8.50243 1.8741 8.16227 1.73559 7.83948 1.82066L8.0306 2.5459ZM12.9154 13.0035C9.64678 13.0035 6.99707 10.3538 6.99707 7.08524H5.49707C5.49707 11.1823 8.81835 14.5035 12.9154 14.5035V13.0035ZM16.944 11.4207C15.8869 12.4035 14.4721 13.0035 12.9154 13.0035V14.5035C14.8657 14.5035 16.6418 13.7499 17.9654 12.5193L16.944 11.4207ZM16.7295 11.7789C15.9437 14.7607 13.2277 16.9586 10.0003 16.9586V18.4586C13.9257 18.4586 17.2249 15.7853 18.1799 12.1611L16.7295 11.7789ZM10.0003 16.9586C6.15734 16.9586 3.04199 13.8433 3.04199 10.0003H1.54199C1.54199 14.6717 5.32892 18.4586 10.0003 18.4586V16.9586ZM3.04199 10.0003C3.04199 6.77289 5.23988 4.05695 8.22173 3.27114L7.83948 1.82066C4.21532 2.77574 1.54199 6.07486 1.54199 10.0003H3.04199ZM6.99707 7.08524C6.99707 5.52854 7.5971 4.11366 8.57989 3.05657L7.48132 2.03522C6.25073 3.35885 5.49707 5.13487 5.49707 7.08524H6.99707Z"
+          fill=""
+        />
+      </svg>
+    </button>
+
+    <!-- User Dropdown -->
+    <div x-data="{ dropdownOpen: false }" class="relative">
+      <button
+        @click="dropdownOpen = !dropdownOpen"
+        class="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:border-brand-300 dark:border-gray-700 dark:hover:border-brand-500 transition-colors"
+      >
+        <span class="hidden text-sm font-medium text-gray-700 dark:text-gray-300 sm:block">
+          <span x-text="localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).email : 'User'"></span>
+        </span>
+        <svg
+          class="fill-current text-gray-500 dark:text-gray-400"
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M4.938 6.531C5.231 6.238 5.706 6.238 5.999 6.531L10 10.531L14.001 6.531C14.294 6.238 14.769 6.238 15.062 6.531C15.355 6.824 15.355 7.299 15.062 7.592L10.531 12.123C10.238 12.416 9.763 12.416 9.47 12.123L4.938 7.592C4.645 7.299 4.645 6.824 4.938 6.531Z"
+            fill=""
+          />
+        </svg>
+      </button>
+
+      <!-- Dropdown Menu -->
+      <div
+        x-show="dropdownOpen"
+        @click.away="dropdownOpen = false"
+        class="absolute right-0 z-50 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg dark:bg-gray-800 dark:border-gray-700"
+        style="display: none;"
+      >
+        <div class="py-2">
+          <a
+            href="settings.html"
+            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            Settings
+          </a>
+          <a
+            href="#"
+            @click.prevent="window.logout && window.logout()"
+            class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+          >
+            Logout
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<script>
+  // Global logout function
+  window.logout = async function() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+  };
+</script>
